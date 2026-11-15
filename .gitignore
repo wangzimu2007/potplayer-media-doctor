@@ -1,0 +1,6 @@
+media-doctor.config.json
+*.log
+*.png
+*.jpg
+Thumbs.db
+.DS_Store
