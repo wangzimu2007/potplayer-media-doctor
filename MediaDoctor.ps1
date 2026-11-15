@@ -1,4 +1,4 @@
-param([string]$FilePath)
+﻿param([string]$FilePath)
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
