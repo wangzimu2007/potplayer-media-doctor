@@ -24,8 +24,10 @@ function Resolve-CommandPath([string]$configured, [string[]]$candidates, [string
 $ffprobe = Resolve-CommandPath ([string]$config.ffprobe) @("$env:ProgramFiles\ffmpeg\bin\ffprobe.exe", "${env:ProgramFiles(x86)}\ffmpeg\bin\ffprobe.exe") 'ffprobe.exe'
 $pot = Resolve-CommandPath ([string]$config.potplayer) @("$env:ProgramFiles\DAUM\PotPlayer\PotPlayerMini64.exe", "${env:ProgramFiles(x86)}\DAUM\PotPlayer\PotPlayerMini64.exe") 'PotPlayerMini64.exe'
 $madvrScript = [string]$config.madvrProfileScript
+$modePresets = @('自动（按片源）','手动选择')
+$modePresets = @('自动（按片源）','手动选择')
 $presets = @('7.1.2','5.1','2.0')
-$videoPresets = @('跟随 PotPlayer 预设（推荐）','自动（按片源）','madVR 电影 SDR','madVR 老片 1080p','MPC-VR 10bit HDR')
+$videoPresets = @('自动（按片源）','madVR 电影 SDR','madVR 老片 1080p','MPC-VR 10bit HDR')
 if (-not $ffprobe) { [System.Windows.Forms.MessageBox]::Show('找不到 ffprobe.exe。请安装 ffmpeg，或在 media-doctor.config.json 中设置 ffprobe。') | Out-Null }
 if (-not $pot) { [System.Windows.Forms.MessageBox]::Show('找不到 PotPlayerMini64.exe。请在 media-doctor.config.json 中设置 potplayer。') | Out-Null }
 
@@ -64,46 +66,72 @@ $btnAnalyze.Location = New-Object System.Drawing.Point(15, 55)
 $btnAnalyze.Size = New-Object System.Drawing.Size(100, 32)
 $form.Controls.Add($btnAnalyze)
 
+$lblMode = New-Object System.Windows.Forms.Label
+$lblMode.Text = '模式：'
+$lblMode.Location = New-Object System.Drawing.Point(125, 63)
+$lblMode.AutoSize = $true
+$form.Controls.Add($lblMode)
+
+$cmbMode = New-Object System.Windows.Forms.ComboBox
+$cmbMode.DropDownStyle = 'DropDownList'
+$cmbMode.Location = New-Object System.Drawing.Point(170, 59)
+$cmbMode.Size = New-Object System.Drawing.Size(100, 28)
+[void]$cmbMode.Items.AddRange($modePresets)
+$cmbMode.SelectedIndex = 0
+$form.Controls.Add($cmbMode)
+
 $lblPreset = New-Object System.Windows.Forms.Label
-$lblPreset.Text = '音频预设：'
-$lblPreset.Location = New-Object System.Drawing.Point(135, 63)
+$lblPreset.Text = '音频：'
+$lblPreset.Location = New-Object System.Drawing.Point(280, 63)
 $lblPreset.AutoSize = $true
 $form.Controls.Add($lblPreset)
 
 $cmbPreset = New-Object System.Windows.Forms.ComboBox
 $cmbPreset.DropDownStyle = 'DropDownList'
-$cmbPreset.Location = New-Object System.Drawing.Point(210, 59)
-$cmbPreset.Size = New-Object System.Drawing.Size(100, 28)
+$cmbPreset.Location = New-Object System.Drawing.Point(330, 59)
+$cmbPreset.Size = New-Object System.Drawing.Size(70, 28)
 [void]$cmbPreset.Items.AddRange($presets)
 $cmbPreset.SelectedIndex = 0
+$cmbPreset.Enabled = $false
 $form.Controls.Add($cmbPreset)
 
 $lblVideo = New-Object System.Windows.Forms.Label
-$lblVideo.Text = '画面预设：'
-$lblVideo.Location = New-Object System.Drawing.Point(325, 63)
+$lblVideo.Text = '画面：'
+$lblVideo.Location = New-Object System.Drawing.Point(410, 63)
 $lblVideo.AutoSize = $true
 $form.Controls.Add($lblVideo)
 
 $cmbVideo = New-Object System.Windows.Forms.ComboBox
 $cmbVideo.DropDownStyle = 'DropDownList'
-$cmbVideo.Location = New-Object System.Drawing.Point(400, 59)
-$cmbVideo.Size = New-Object System.Drawing.Size(200, 28)
+$cmbVideo.Location = New-Object System.Drawing.Point(460, 59)
+$cmbVideo.Size = New-Object System.Drawing.Size(180, 28)
 [void]$cmbVideo.Items.AddRange($videoPresets)
 $cmbVideo.SelectedIndex = 0
+$cmbVideo.Enabled = $false
 $form.Controls.Add($cmbVideo)
 
 $btnPlay = New-Object System.Windows.Forms.Button
 $btnPlay.Text = '一键播放'
-$btnPlay.Location = New-Object System.Drawing.Point(620, 55)
-$btnPlay.Size = New-Object System.Drawing.Size(100, 32)
+$btnPlay.Location = New-Object System.Drawing.Point(650, 55)
+$btnPlay.Size = New-Object System.Drawing.Size(90, 32)
 $form.Controls.Add($btnPlay)
 
 $btnCopy = New-Object System.Windows.Forms.Button
 $btnCopy.Text = '复制推荐'
-$btnCopy.Location = New-Object System.Drawing.Point(730, 55)
+$btnCopy.Location = New-Object System.Drawing.Point(750, 55)
 $btnCopy.Size = New-Object System.Drawing.Size(95, 32)
 $form.Controls.Add($btnCopy)
 
+$cmbMode.Add_SelectedIndexChanged({
+    $manual = ($cmbMode.SelectedIndex -eq 1)
+    $cmbPreset.Enabled = $manual
+    $cmbVideo.Enabled = $manual
+    if ($manual) {
+        $lblStatus.Text = '手动模式：可分别选择音频和画面预设。'
+    } else {
+        $lblStatus.Text = '自动模式：按片源同时匹配音频和画面。'
+    }
+})
 $lblStatus = New-Object System.Windows.Forms.Label
 $lblStatus.Text = '选择视频，或把文件拖进窗口。'
 $lblStatus.Location = New-Object System.Drawing.Point(15, 98)
@@ -186,10 +214,28 @@ function Get-Recommend($data) {
             $lines.Add(('视频：{0}x{1} 4K/SDR。建议 madVR 电影档，图像放大基本不参与。' -f $v.width,$v.height))
         }
     }
-    $lines.Add('音频预设按钮在左上角，可按外设手动改。')
+    $lines.Add('自动模式会同时匹配音频/画面；切到手动选择可单独调整。')
     return $lines
 }
 
+function Get-AutoAudioPreset($data) {
+    $a = $data.streams | Where-Object { $_.codec_type -eq 'audio' } | Select-Object -First 1
+    if (-not $a) { return '2.0' }
+    $ch = [int]$a.channels
+    if ($ch -ge 6) { return '7.1.2' }
+    if ($ch -eq 5) { return '5.1' }
+    return '2.0'
+}
+function Get-AutoVideoPreset($data) {
+    $v = $data.streams | Where-Object { $_.codec_type -eq 'video' } | Select-Object -First 1
+    if (-not $v) { return 'madVR 电影 SDR' }
+    $isHdr = $v.color_transfer -in @('smpte2084','arib-std-b67')
+    $dv = $false
+    if ($v.side_data_list) { foreach ($sd in $v.side_data_list) { if ($sd.side_data_type -match 'DOVI|Dolby Vision') { $dv = $true } } }
+    if ($isHdr -or $dv) { return 'MPC-VR 10bit HDR' }
+    if ([int]$v.width -le 1280) { return 'madVR 老片 1080p' }
+    return 'madVR 电影 SDR'
+}
 $script:LastReport = ''
 $script:LastData = $null
 function Analyze {
@@ -203,20 +249,18 @@ function Analyze {
         $lines = @(Format-Info $data) + @(Get-Recommend $data)
         $script:LastReport = ($lines -join "`r`n")
         $txtOut.Text = $script:LastReport
-        $lblStatus.Text = '检测完成。选择音频/画面预设后可直接播放。'
-        $a = $data.streams | Where-Object { $_.codec_type -eq 'audio' } | Select-Object -First 1
-        if ($a -and [int]$a.channels -le 2) { $cmbPreset.SelectedItem = '2.0' }
-        elseif ($a -and [int]$a.channels -ge 6) { $cmbPreset.SelectedItem = '7.1.2' }
-        $v = $data.streams | Where-Object { $_.codec_type -eq 'video' } | Select-Object -First 1
-        $autoVideo = 1
-        if ($v) {
-            $isHdr = $v.color_transfer -in @('smpte2084','arib-std-b67')
-            $dv = $false
-            if ($v.side_data_list) { foreach ($sd in $v.side_data_list) { if ($sd.side_data_type -match 'DOVI|Dolby Vision') { $dv = $true } } }
-            if ($isHdr -or $dv) { $autoVideo = 3 }
-            elseif ([int]$v.width -le 1280) { $autoVideo = 2 }
+        $autoAudio = Get-AutoAudioPreset $data
+        $autoVideo = Get-AutoVideoPreset $data
+        $cmbPreset.SelectedItem = $autoAudio
+        $cmbVideo.SelectedItem = $autoVideo
+        $manual = ($cmbMode.SelectedIndex -eq 1)
+        $cmbPreset.Enabled = $manual
+        $cmbVideo.Enabled = $manual
+        if ($manual) {
+            $lblStatus.Text = "检测完成：自动匹配为 音频 $autoAudio / 画面 $autoVideo；手动模式可直接调整。"
+        } else {
+            $lblStatus.Text = "检测完成：自动模式将同时使用 音频 $autoAudio / 画面 $autoVideo。"
         }
-        $cmbVideo.SelectedIndex = 0
     } catch {
         $lblStatus.Text = '检测失败'
         $txtOut.Text = $_.Exception.Message + "`r`nLine=" + $_.InvocationInfo.ScriptLineNumber
@@ -234,26 +278,25 @@ $btnPlay.Add_Click({
         $path = $txtPath.Text.Trim('"')
         if (-not (Test-Path -LiteralPath $path)) { throw '文件不存在' }
         if (-not (Test-Path -LiteralPath $pot)) { throw '找不到 PotPlayer' }
-        $audioPreset = [string]$cmbPreset.SelectedItem
-        $videoPreset = [string]$cmbVideo.SelectedItem
-        if ($videoPreset -ne '跟随 PotPlayer 预设（推荐）') {
-            if ($videoPreset -eq '自动（按片源）') {
-                $v = $script:LastData.streams | Where-Object { $_.codec_type -eq 'video' } | Select-Object -First 1
-                $isHdr = $v -and ($v.color_transfer -in @('smpte2084','arib-std-b67'))
-                if ($isHdr) { $videoPreset = 'MPC-VR 10bit HDR' }
-                elseif ($v -and [int]$v.width -le 1280) { $videoPreset = 'madVR 老片 1080p' }
-                else { $videoPreset = 'madVR 电影 SDR' }
-            }
-            Get-Process -Name 'PotPlayerMini64' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Milliseconds 800
-            if ($videoPreset -like 'MPC-VR*') {
-                Set-ItemProperty -Path 'HKCU:\Software\DAUM\PotPlayerMini64' -Name 'VideoRen2' -Value 16 -Type DWord
-            } else {
-                $madvrProfile = if ($videoPreset -like '*老片*') { 'old-film' } else { 'movie' }
-                if (-not $madvrScript) { throw '未配置 madVRProfileScript，无法切换 madVR 画面预设' }; & $madvrScript -ProfileName $madvrProfile -NoLaunch | Out-Null
-                Start-Sleep -Milliseconds 500
-                Set-ItemProperty -Path 'HKCU:\Software\DAUM\PotPlayerMini64' -Name 'VideoRen2' -Value 10 -Type DWord
-            }
+        if (-not $script:LastData) { throw '请先点击“开始检测”' }
+        $manual = ($cmbMode.SelectedIndex -eq 1)
+        if ($manual) {
+            $audioPreset = [string]$cmbPreset.SelectedItem
+            $videoPreset = [string]$cmbVideo.SelectedItem
+        } else {
+            $audioPreset = Get-AutoAudioPreset $script:LastData
+            $videoPreset = Get-AutoVideoPreset $script:LastData
+        }
+        if ($videoPreset -eq '自动（按片源）') { $videoPreset = Get-AutoVideoPreset $script:LastData }
+        Get-Process -Name 'PotPlayerMini64' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 800
+        if ($videoPreset -like 'MPC-VR*') {
+            Set-ItemProperty -Path 'HKCU:\Software\DAUM\PotPlayerMini64' -Name 'VideoRen2' -Value 16 -Type DWord
+        } else {
+            $madvrProfile = if ($videoPreset -like '*老片*') { 'old-film' } else { 'movie' }
+            if (-not $madvrScript) { throw '未配置 madVRProfileScript，无法切换 madVR 画面预设' }; & $madvrScript -ProfileName $madvrProfile -NoLaunch | Out-Null
+            Start-Sleep -Milliseconds 500
+            Set-ItemProperty -Path 'HKCU:\Software\DAUM\PotPlayerMini64' -Name 'VideoRen2' -Value 10 -Type DWord
         }
         $argLine = '"' + $path + '" /new config="' + $audioPreset + '"'
         Start-Process -FilePath $pot -ArgumentList $argLine
