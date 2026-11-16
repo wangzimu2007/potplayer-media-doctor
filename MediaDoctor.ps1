@@ -4,6 +4,10 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $ErrorActionPreference = 'Stop'
+try {
+    [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+    $OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+} catch { }
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $configPath = Join-Path $ScriptDir 'media-doctor.config.json'
 $config = @{}
